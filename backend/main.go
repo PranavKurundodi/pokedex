@@ -21,6 +21,7 @@ func main() {
 
 	r.HandleFunc("/pokemon", handlers.GetPokemon).Methods("GET")
 	r.HandleFunc("/pokemon/byName", handlers.GetPokemonByName).Methods("GET")
+	r.HandleFunc("/pokemon/model", handlers.PokemonProbModel).Methods("GET")
 
 	log.Println("Server started on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
