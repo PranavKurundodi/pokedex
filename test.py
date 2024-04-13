@@ -13,7 +13,7 @@ model = tf.keras.models.load_model(
 
 # Define the target image size
 target_size = (224, 224)
-image = "C:\\Users\\prana\\OneDrive\\Documents\\college\\pokedex\\backend\\model\\charizard.png"
+image = "C:\\Users\\prana\\OneDrive\\Documents\\college\\pokedex\\backend\\model\\pokemon.png"
 
 # Load and preprocess the input image
 input_image = load_img(image, target_size=target_size)
@@ -177,9 +177,10 @@ pokemon_names = [
 ]
 
 # Get the top 3 predictions
-top_3_indices = np.argsort(predictions[0])[-3:][::-1]
-top_3_probabilities = [predictions[0][i] for i in top_3_indices]
-top_3_pokemon = [pokemon_names[i] for i in top_3_indices]
+top_index = np.argmax(predictions[0])  # Get the index of the maximum probability
+top_probability = predictions[0][top_index]  # Get the probability of the top prediction
+top_pokemon = pokemon_names[top_index]  # Get the name of the top predicted Pokémon
 
 # Print the results
-print(top_3_pokemon, top_3_probabilities)
+print(top_pokemon)
+
