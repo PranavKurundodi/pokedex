@@ -48,6 +48,18 @@ func GetPokemonByName(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(foundPokemon)
 }
+func revstr(a string) (r string) {
+	runes := []rune(a)
+
+	// Reverse the slice
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+
+	// Convert the slice of runes back to a string
+	r = string(runes)
+	return r
+}
 
 func PokemonProbModel(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("python", "C:\\Users\\prana\\OneDrive\\Documents\\college\\pokedex\\backend\\model\\test.py")
@@ -66,40 +78,30 @@ func PokemonProbModel(w http.ResponseWriter, r *http.Request) {
 	// Get the output of the Python script
 	pythonOutput := stdout.String()
 
-	// Use the Python output as needed in your Go code
-	parts := strings.Split(pythonOutput, "] ")
-	pokemonPart := strings.Trim(parts[0], "[]")
-	probPart := strings.Trim(parts[1], "[]")
+	// Convert the slice of runes back to a string
+	reversedStr := revstr(pythonOutput)
 
-	// Split Pokémon names and probabilities into arrays
-	top3pokemons := strings.Split(pokemonPart, ", ")
-	probabilitiesStr := strings.Split(probPart, ", ")
+	index := strings.Index(reversedStr, "pets")
+	if index == -1 {
+		// "pets" not found
+		fmt.Println("String 'pets' not found")
+		return
+	}
 
-	// Convert probabilities from string to float64
-	var top3prob []float64
-	for _, str := range probabilitiesStr {
-		var prob float64
-		_, err := fmt.Sscanf(str, "%f", &prob)
-		if err != nil {
-			panic(err)
+	// Extract the substring before the index of "pets"
+	substr := reversedStr[:index]
+
+	toppokemon := revstr(substr)
+	toppokemon = strings.ToLower(toppokemon)
+	toppokemon = strings.TrimSpace(strings.ReplaceAll(toppokemon, "\n", ""))
+	// Print the substring
+	var toppokemonStats models.Pokemon
+	for _, pokemon := range pokedex {
+		if toppokemon == pokemon.Name {
+			toppokemonStats = pokemon
 		}
-		top3prob = append(top3prob, prob)
 	}
-
-	type ModelResult struct {
-		Pokemon     string
-		Probability float64
-	}
-	var modelResults []ModelResult
-
-	// Iterate over the arrays and store each result as a ModelResult struct
-	for i := 0; i < len(top3pokemons); i++ {
-		result := ModelResult{
-			Pokemon:     top3pokemons[i],
-			Probability: top3prob[i],
-		}
-		modelResults = append(modelResults, result)
-	}
-	json.NewEncoder(w).Encode(modelResults)
+	json.NewEncoder(w).Encode(toppokemonStats)
 
 }
+
