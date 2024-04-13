@@ -62,7 +62,7 @@ func revstr(a string) (r string) {
 }
 
 func PokemonProbModel(w http.ResponseWriter, r *http.Request) {
-	cmd := exec.Command("python", "C:\\Users\\prana\\OneDrive\\Documents\\college\\pokedex\\backend\\model\\test.py")
+	cmd := exec.Command("python", "C:\\Users\\prana\\OneDrive\\Documents\\college\\pokedex\\model\\test.py")
 
 	// Create a buffer to store the output
 	var stdout, stderr bytes.Buffer
