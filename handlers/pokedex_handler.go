@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +11,10 @@ import (
 	"strings"
 
 	"github.com/PranavKurundodi/pokedex/backend/models"
+	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var pokedex []models.Pokemon
@@ -94,6 +99,7 @@ func PokemonProbModel(w http.ResponseWriter, r *http.Request) {
 	toppokemon := revstr(substr)
 	toppokemon = strings.ToLower(toppokemon)
 	toppokemon = strings.TrimSpace(strings.ReplaceAll(toppokemon, "\n", ""))
+
 	// Print the substring
 	var toppokemonStats models.Pokemon
 	for _, pokemon := range pokedex {
@@ -103,5 +109,159 @@ func PokemonProbModel(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(toppokemonStats)
 
+}
+
+var ctx = context.TODO()
+
+func NewMongoClient() (*mongo.Client, error) {
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func RegisterUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) {
+	var user models.User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if user already exists
+	collection := client.Database("pokedex").Collection("users")
+	var existingUser models.User
+	err = collection.FindOne(ctx, bson.M{"username": user.Username}).Decode(&existingUser)
+	if err == nil {
+		http.Error(w, "Username already exists", http.StatusBadRequest)
+		return
+	}
+
+	// If inventory is nil, initialize it as an empty array
+	if user.Inventory == nil {
+		user.Inventory = []models.Pokemon{}
+	}
+
+	// Insert new user with inventory
+	_, err = collection.InsertOne(ctx, user)
+	if err != nil {
+		http.Error(w, "Failed to register user", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func LoginUser(w http.ResponseWriter, r *http.Request, client *mongo.Client) {
+	var user models.User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if user exists and password matches
+	collection := client.Database("pokedex").Collection("users")
+	var existingUser models.User
+	err = collection.FindOne(ctx, bson.M{"username": user.Username}).Decode(&existingUser)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	if existingUser.Password != user.Password {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Generate and set JWT token
+	// Here you can use libraries like jwt-go to generate JWT tokens
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func AddToInventory(w http.ResponseWriter, r *http.Request, client *mongo.Client) {
+	vars := mux.Vars(r)
+	username := vars["username"] // Get username from URL path
+	var pokemon models.Pokemon
+
+	err := json.NewDecoder(r.Body).Decode(&pokemon)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Access the "users" collection
+	collection := client.Database("pokedex").Collection("users")
+
+	// Update the user's inventory
+	_, err = collection.UpdateOne(context.Background(), bson.M{"username": username}, bson.M{"$addToSet": bson.M{"inventory": pokemon}})
+	if err != nil {
+		http.Error(w, "Failed to add Pokemon to inventory", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func RemoveFromInventory(w http.ResponseWriter, r *http.Request, client *mongo.Client) {
+	vars := mux.Vars(r)
+	username := vars["username"] // Get username from URL path
+	var pokemon models.Pokemon
+
+	err := json.NewDecoder(r.Body).Decode(&pokemon)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Access the "users" collection
+	collection := client.Database("pokedex").Collection("users")
+
+	// Update the user's inventory
+	_, err = collection.UpdateOne(context.Background(), bson.M{"username": username}, bson.M{"$pull": bson.M{"inventory": pokemon}})
+	if err != nil {
+		http.Error(w, "Failed to remove Pokemon from inventory", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check authentication token
+		// Code to verify JWT token goes here
+
+		// If token is valid, proceed to next middleware
+		next.ServeHTTP(w, r)
+	})
+}
+func GetUserInventory(w http.ResponseWriter, r *http.Request, client *mongo.Client) {
+	// Get username from request parameters
+	vars := mux.Vars(r)
+	username := vars["username"]
+
+	// Access the "users" collection
+	collection := client.Database("pokedex").Collection("users")
+
+	// Find the user by username
+	var user models.User
+	err := collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Construct JSON response
+	jsonResponse := map[string]interface{}{
+		"username":  user.Username,
+		"inventory": user.Inventory,
+	}
+
+	// Encode JSON response and write to response writer
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(jsonResponse)
 }
 
