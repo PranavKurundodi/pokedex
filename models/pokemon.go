@@ -1,9 +1,5 @@
 package models
 
-import (
-	"encoding/csv"
-	"os"
-)
 
 type Pokemon struct {
 	Name      string `json:"name"`
